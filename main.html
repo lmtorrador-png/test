@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="es"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Ventilador de secado: costos y beneficio económico</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.js"></script>
+<style>
+:root{--bg:#F4F6F5;--card:#FFFFFF;--ink:#1B2A2F;--mut:#5C6B70;--line:#DDE3E1;--pine:#1D4B3E;--sage:#7FA593;--gold:#A8812F;--slate:#3C5A66;
+box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#101A18;--card:#17252A;--ink:#E7EEEC;--mut:#9DB0AB;--line:#2B3D40;--pine:#6FB39B;--sage:#4C7F6C;--gold:#D2AC5C;--slate:#7FA3B2}}
+:root[data-theme="dark"]{--bg:#101A18;--card:#17252A;--ink:#E7EEEC;--mut:#9DB0AB;--line:#2B3D40;--pine:#6FB39B;--sage:#4C7F6C;--gold:#D2AC5C;--slate:#7FA3B2}
+*{box-sizing:border-box}html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+.wrap{max-width:1180px;margin:0 auto;padding:28px 20px 40px}
+h1,h2,.kv{font-family:Georgia,"Iowan Old Style","Times New Roman",serif;font-weight:600}
+h1{font-size:28px;margin:0 0 4px;letter-spacing:-.01em}
+.sub{color:var(--mut);margin:0 0 22px;max-width:70ch}
+h2{font-size:17px;margin:0 0 10px}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px;margin-bottom:16px}
+.kpi{background:var(--card);border:1px solid var(--line);border-left:3px solid var(--pine);border-radius:4px;padding:12px 14px}
+.kpi.g{border-left-color:var(--gold)}
+.kv{font-size:24px;line-height:1.2}.kl{color:var(--mut);font-size:12.5px;margin-top:2px}
+.grid{display:grid;grid-template-columns:300px 1fr;gap:16px;align-items:start}
+.card{background:var(--card);border:1px solid var(--line);border-radius:6px;padding:16px}
+.row{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:16px}
+.ctl{margin:0 0 12px}.ctl label{display:flex;justify-content:space-between;font-size:13px;color:var(--mut)}
+.ctl b{color:var(--ink);font-weight:600}
+input[type=range]{width:100%;accent-color:var(--pine)}
+.sc{display:flex;gap:6px;margin-bottom:14px}
+.sc button{flex:1;padding:7px 4px;border:1px solid var(--line);background:transparent;color:var(--ink);border-radius:4px;font:inherit;font-size:13px;cursor:pointer}
+.sc button[aria-pressed=true]{background:var(--pine);color:var(--bg);border-color:var(--pine)}
+button:focus-visible,input:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
+.ch{position:relative;height:290px}
+.tw{overflow-x:auto}table{width:100%;border-collapse:collapse;font-size:13.5px}
+th,td{text-align:right;padding:7px 8px;border-bottom:1px solid var(--line);white-space:nowrap}
+th:first-child,td:first-child{text-align:left}th{color:var(--mut);font-weight:500}
+.tot td{font-weight:600;border-top:1.5px solid var(--ink)}
+.note{color:var(--mut);font-size:12.5px;margin-top:14px}
+.verdict{margin-top:16px;border-left:3px solid var(--gold);padding:10px 14px;background:var(--card);border-radius:0 4px 4px 0}
+@media(max-width:860px){.grid,.row{grid-template-columns:1fr}}
+</style></head><body><div class="wrap">
+<h1>Ventilador de secado con motor reutilizado</h1>
+<p class="sub">Costos de mano de obra y beneficio económico para pequeños productores. Los materiales provienen del centro de acopio sin costo; ajuste los supuestos y todo se recalcula.</p>
+<div class="kpis" id="kpis"></div>
+<div class="grid">
+<div class="card"><h2>Supuestos</h2>
+<div class="sc" id="sc"></div><div id="ctls"></div></div>
+<div>
+<div class="card"><h2>Costos, ingresos y beneficio a productores (5 años)</h2><div class="ch"><canvas id="c1" role="img" aria-label="Costos, ingresos y beneficio acumulado a productores por año"></canvas></div></div>
+<div class="row">
+<div class="card"><h2>Costo de un ventilador por actividad</h2><div class="ch"><canvas id="c2" role="img" aria-label="Distribución del costo unitario por actividad"></canvas></div></div>
+<div class="card"><h2>Para cada familia productora</h2><div id="fam"></div></div>
+</div></div></div>
+<div class="card" style="margin-top:16px"><h2>Proyección anual</h2><div class="tw"><table id="tb"></table></div>
+<div class="verdict" id="vd"></div>
+<p class="note">Cifras en pesos colombianos. Los supuestos son valores de partida para validar con cotizaciones y con el piloto de 5 a 10 familias; no son datos medidos.</p></div>
+</div>
+<script>
+const P={rate:12000,hRec:3,hEns:6,hPru:1,hAco:1.5,hCap:2,ins:0,u1:10,g:50,mg:20,coord:20,kg:2500,pk:18000,mej:4,ref:1200000,kgm:6};
+const D=[["rate","Valor hora de mano de obra (con prestaciones)",8000,25000,500,v=>cop(v)],
+["hRec","Horas de reacondicionar el motor",1,8,.5,v=>v+" h"],["hEns","Horas de ensamblar el ventilador",2,16,.5,v=>v+" h"],
+["hPru","Horas de pruebas eléctricas",.5,4,.5,v=>v+" h"],["hAco","Horas en el centro de acopio por motor",.5,4,.5,v=>v+" h"],
+["hCap","Horas de capacitación por familia",0,8,.5,v=>v+" h"],["ins","Insumos con costo (capacitor, protección)",0,80000,5000,v=>cop(v)],
+["u1","Ventiladores en el año 1",5,100,5,v=>v],["g","Crecimiento anual de ventas",0,100,5,v=>v+" %"],
+["mg","Margen sobre el costo",0,40,1,v=>v+" %"],["coord","Horas mensuales de coordinación",0,80,5,v=>v+" h"],
+["kg","Café pergamino seco por familia al año",1000,6000,250,v=>v+" kg"],["pk","Precio por kg de pergamino seco",12000,28000,500,v=>cop(v)],
+["mej","Pérdida de valor evitada por mejor secado",0,10,.5,v=>v+" %"],["ref","Ventilador comercial equivalente (nuevo)",600000,2500000,50000,v=>cop(v)],
+["kgm","Peso de cada motor desviado",3,12,.5,v=>v+" kg"]];
+const S={Conservador:{mej:2,g:25,mg:15},Base:{mej:4,g:50,mg:20},Optimista:{mej:6,g:75,mg:20}};
+const cop=n=>Math.round(n).toLocaleString("es-CO",{style:"currency",currency:"COP",maximumFractionDigits:0});
+const M=n=>Math.abs(n)>=1e6?"$ "+(n/1e6).toLocaleString("es-CO",{maximumFractionDigits:1})+" M":cop(n);
+const $=id=>document.getElementById(id);let c1,c2,cur="Base";
+function build(){
+$("sc").innerHTML=Object.keys(S).map(k=>`<button aria-pressed="${k==cur}" data-k="${k}">${k}</button>`).join("");
+$("sc").onclick=e=>{const k=e.target.dataset.k;if(!k)return;cur=k;Object.assign(P,S[k]);build();draw()};
+$("ctls").innerHTML=D.map(([k,l,a,b,s,f])=>`<div class="ctl"><label for="${k}">${l}<b id="v${k}">${f(P[k])}</b></label><input type="range" id="${k}" min="${a}" max="${b}" step="${s}" value="${P[k]}"></div>`).join("");
+D.forEach(([k,,,,,f])=>$(k).oninput=e=>{P[k]=+e.target.value;$("v"+k).textContent=f(P[k]);draw()});}
+function calc(){
+const h=P.hRec+P.hEns+P.hPru+P.hAco+P.hCap,lab=h*P.rate,cu=lab+P.ins,pv=cu*(1+P.mg/100),fix=P.coord*12*P.rate;
+const ann=P.kg*P.pk*P.mej/100;let cum=0,tb=0,ti=0,tc=0,tn=0,rows=[];
+for(let t=1;t<=5;t++){const u=Math.round(P.u1*Math.pow(1+P.g/100,t-1));const cost=u*cu+fix,inc=u*pv,
+ben=(cum+.5*u)*ann+u*Math.max(0,P.ref-pv);cum+=u;tb+=ben;ti+=inc;tc+=cost;tn+=inc-cost;rows.push({t,u,cost,inc,net:inc-cost,ben,tb,cum});}
+const be=pv>cu?Math.ceil(fix/(pv-cu)):null;
+return{h,lab,cu,pv,fix,ann,rows,tb,ti,tc,tn,cum,be,pay:ann>0?pv/(ann/12):null,bc:tc>0?tb/tc:0,
+jobs:(rows[0].u*(h-P.hCap)+P.coord*12)/2304,res:cum*P.kgm/1000,save:P.ref-pv};}
+function draw(){
+const r=calc(),css=getComputedStyle(document.documentElement),V=n=>css.getPropertyValue(n).trim();
+Chart.defaults.color=V("--mut");Chart.defaults.borderColor=V("--line");Chart.defaults.font.family="system-ui,sans-serif";
+$("kpis").innerHTML=[["Costo por ventilador",cop(r.cu),""],["Precio al productor",cop(r.pv),""],
+["Recuperación para la familia",r.pay?r.pay.toFixed(1).replace(".",",")+" meses":"—","g"],
+["Beneficio a productores (5 años)",M(r.tb),"g"],["Beneficio por cada $1 de costo",r.bc.toFixed(1).replace(".",",")+" a 1",""],
+["Residuo desviado",r.res.toLocaleString("es-CO",{maximumFractionDigits:1})+" t de motores",""]]
+.map(k=>`<div class="kpi ${k[2]}"><div class="kv">${k[1]}</div><div class="kl">${k[0]}</div></div>`).join("");
+const yrs=r.rows.map(x=>"Año "+x.t);
+const d1={labels:yrs,datasets:[{type:"bar",label:"Costos (mano de obra)",data:r.rows.map(x=>x.cost),backgroundColor:V("--slate")},
+{type:"bar",label:"Ingresos por venta",data:r.rows.map(x=>x.inc),backgroundColor:V("--sage")},
+{type:"line",label:"Beneficio acumulado a productores",data:r.rows.map(x=>x.tb),borderColor:V("--gold"),backgroundColor:V("--gold"),borderWidth:2.5,tension:.25,pointRadius:4}]};
+const o1={responsive:true,maintainAspectRatio:false,plugins:{legend:{position:"bottom"},tooltip:{callbacks:{label:c=>c.dataset.label+": "+cop(c.raw)}}},scales:{y:{ticks:{callback:v=>M(v)}}}};
+if(c1){c1.data=d1;c1.options=o1;c1.update()}else c1=new Chart($("c1"),{data:d1,options:o1});
+const w=[["Reacondicionar motor",P.hRec],["Ensamblar ventilador",P.hEns],["Pruebas eléctricas",P.hPru],["Acopio y selección",P.hAco],["Capacitación",P.hCap]];
+const d2={labels:w.map(a=>a[0]).concat(P.ins?["Insumos"]:[]),datasets:[{data:w.map(a=>a[1]*P.rate).concat(P.ins?[P.ins]:[]),backgroundColor:[V("--pine"),V("--slate"),V("--sage"),V("--gold"),"#8DA4AB","#B9C4C0"],borderColor:V("--card"),borderWidth:2}]};
+const o2={responsive:true,maintainAspectRatio:false,cutout:"58%",plugins:{legend:{position:"right"},tooltip:{callbacks:{label:c=>c.label+": "+cop(c.raw)}}}};
+if(c2){c2.data=d2;c2.options=o2;c2.update()}else c2=new Chart($("c2"),{type:"doughnut",data:d2,options:o2});
+$("fam").innerHTML=`<table><tr><td>Beneficio anual por mejor secado</td><td>${cop(r.ann)}</td></tr>
+<tr><td>Ahorro frente a un equipo nuevo</td><td>${cop(r.save)}</td></tr>
+<tr><td>Ahorro porcentual de inversión</td><td>${(r.save/P.ref*100).toFixed(0)} %</td></tr>
+<tr><td>Beneficio en 5 años</td><td>${cop(r.ann*5+r.save)}</td></tr>
+<tr><td>Empleos equivalentes en el año 1</td><td>${r.jobs.toFixed(1).replace(".",",")}</td></tr>
+<tr><td>Punto de equilibrio del proyecto</td><td>${r.be?r.be+" ventiladores/año":"—"}</td></tr></table>`;
+$("tb").innerHTML=`<tr><th>Año</th><th>Ventiladores</th><th>Costos</th><th>Ingresos</th><th>Resultado</th><th>Beneficio a productores</th></tr>`+
+r.rows.map(x=>`<tr><td>${x.t}</td><td>${x.u}</td><td>${cop(x.cost)}</td><td>${cop(x.inc)}</td><td>${cop(x.net)}</td><td>${cop(x.ben)}</td></tr>`).join("")+
+`<tr class="tot"><td>Total</td><td>${r.cum}</td><td>${cop(r.tc)}</td><td>${cop(r.ti)}</td><td>${cop(r.tn)}</td><td>${cop(r.tb)}</td></tr>`;
+$("vd").innerHTML=`<b>${r.tn>=0?"Sostenible:":"Requiere ajuste:"}</b> ${r.tn>=0?"los ingresos cubren la mano de obra y la coordinación":"los ingresos no cubren la coordinación; suba el margen o el volumen"}, con resultado de ${M(r.tn)} en 5 años. Cada familia recupera su inversión en ${r.pay?r.pay.toFixed(1).replace(".",",")+" meses":"—"}.`;}
+build();draw();
+matchMedia("(prefers-color-scheme: dark)").addEventListener("change",()=>{draw()});
+</script></body></html>
